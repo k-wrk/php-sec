@@ -1,6 +1,6 @@
 [project]
 name = "php-sec"
-version = "0.1.0"
+version = "0.1.1"
 description = "PHP/PHP-FPM and Nginx Security Audit and Automated Remediation CLI"
 license = "PolyForm-Noncommercial-1.0.0"
 homepage = ""
