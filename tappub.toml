@@ -1,0 +1,17 @@
+[project]
+name = "php-sec"
+version = "0.1.0"
+description = "PHP/PHP-FPM and Nginx Security Audit and Automated Remediation CLI"
+license = "PolyForm-Noncommercial-1.0.0"
+homepage = ""
+
+[tap]
+repo = "k-wrk/homebrew-tap"
+
+[build]
+type = "cargo"
+dependencies = []
+build_dependencies = []
+
+[hooks]
+files = []

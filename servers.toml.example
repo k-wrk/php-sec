@@ -1,0 +1,19 @@
+# Droplets / servers configuration for security audit and remediation
+
+[defaults]
+ssh_port = 22
+user = "root"
+# Leave empty to use system default (~/.ssh/id_rsa or ~/.ssh/id_ed25519) or ssh-agent
+# identity_file = "~/.ssh/id_ed25519"
+
+[[servers]]
+name = "prod-app-01"
+host = "192.168.1.10"
+user = "root"
+port = 22
+
+[[servers]]
+name = "prod-app-02"
+host = "192.168.1.11"
+user = "root"
+port = 22
