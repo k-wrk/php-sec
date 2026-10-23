@@ -73,16 +73,20 @@ pub fn run_audit(server_name: &str, host: &str, client: &RemoteClient) -> Result
 
     let mut checks = Vec::new();
 
-    // PHP Version Audit (PHP 8.1 >= 8.1.31, 8.2 >= 8.2.26, 8.3 >= 8.3.14, 8.4 >= 8.4.1)
+    // PHP Version Audit (PHP2Shell: CVE-2026-109618 & CVE-2026-109619)
     if php_installed {
-        let is_php_updated = is_version_safe(&php_version);
+        let (is_php_updated, safe_target) = check_php2shell_version(&php_version);
         checks.push(SecurityCheck {
             category: "PHP Version".into(),
-            item: "PHP Security Patch".into(),
+            item: "PHP2Shell Patch (CVE-2026-109618/9)".into(),
             current_value: php_version.clone(),
-            expected_value: "Security patched version".into(),
+            expected_value: safe_target.clone(),
             is_secure: is_php_updated,
-            recommendation: "Run 'apt-get --only-upgrade install php*-fpm php*-cli'".into(),
+            recommendation: if is_php_updated {
+                "PHP version is secure against PHP2Shell".into()
+            } else {
+                format!("Upgrade PHP to {} or higher ('apt-get --only-upgrade install php*-fpm php*-cli')", safe_target)
+            },
         });
 
         // 5. Audit php.ini directives: check FPM ini if present, otherwise CLI
@@ -169,10 +173,17 @@ impl AuditReport {
     }
 }
 
-fn is_version_safe(version: &str) -> bool {
+/// Verifies if the PHP version has the patches for PHP2Shell (CVE-2026-109618 and CVE-2026-109619):
+/// Safe versions:
+/// - PHP 8.2: >= 8.2.35
+/// - PHP 8.3: >= 8.3.36
+/// - PHP 8.4: >= 8.4.27
+/// - PHP 8.5: >= 8.5.12
+/// - PHP <= 8.1: EOL / intrinsically vulnerable without backport
+pub fn check_php2shell_version(version: &str) -> (bool, String) {
     let parts: Vec<&str> = version.split('.').collect();
     if parts.len() < 3 {
-        return false;
+        return (false, ">= 8.2.35 / 8.3.36 / 8.4.27 / 8.5.12".to_string());
     }
     let major: u32 = parts[0].parse().unwrap_or(0);
     let minor: u32 = parts[1].parse().unwrap_or(0);
@@ -180,11 +191,34 @@ fn is_version_safe(version: &str) -> bool {
     let patch: u32 = patch_str.parse().unwrap_or(0);
 
     match (major, minor) {
-        (8, 1) => patch >= 31,
-        (8, 2) => patch >= 26,
-        (8, 3) => patch >= 14,
-        (8, 4) => patch >= 1,
-        (m, _) if m > 8 => true,
-        _ => false,
+        (8, 2) => (patch >= 35, ">= 8.2.35".to_string()),
+        (8, 3) => (patch >= 36, ">= 8.3.36".to_string()),
+        (8, 4) => (patch >= 27, ">= 8.4.27".to_string()),
+        (8, 5) => (patch >= 12, ">= 8.5.12".to_string()),
+        (m, min) if m > 8 || (m == 8 && min > 5) => (true, "Secure branch".to_string()),
+        _ => (false, "EOL (Upgrade to 8.2.35+, 8.3.36+ or 8.4.27+)".to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_php2shell_safe_versions() {
+        assert_eq!(check_php2shell_version("8.2.35").0, true);
+        assert_eq!(check_php2shell_version("8.2.34").0, false);
+
+        assert_eq!(check_php2shell_version("8.3.36").0, true);
+        assert_eq!(check_php2shell_version("8.3.35").0, false);
+
+        assert_eq!(check_php2shell_version("8.4.27").0, true);
+        assert_eq!(check_php2shell_version("8.4.26").0, false);
+
+        assert_eq!(check_php2shell_version("8.5.12").0, true);
+        assert_eq!(check_php2shell_version("8.5.11").0, false);
+
+        // PHP 8.1 and below are EOL and vulnerable
+        assert_eq!(check_php2shell_version("8.1.31").0, false);
     }
 }
